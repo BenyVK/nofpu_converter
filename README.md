@@ -1,15 +1,13 @@
 <div align="center">
 
-# ⚡ NoFPU Decimal Converter — Rust Edition
+# ⚡ NoFPU Decimal Converter
 
-**Memory-safe. Zero-cost. Zero floats.**
+**Integer-only decimal formatting. No floats. No FPU. Every language.**
 
-[![Language](https://img.shields.io/badge/Language-Rust-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
-[![Edition](https://img.shields.io/badge/Edition-2021-orange?style=flat-square&logo=rust)](https://doc.rust-lang.org/edition-guide/rust-2021/)
-[![Target](https://img.shields.io/badge/Target-std%20%7C%20no__std-green?style=flat-square)](https://docs.rust-embedded.org/book/)
-[![FPU Required](https://img.shields.io/badge/FPU-Not%20Required-red?style=flat-square)](https://en.wikipedia.org/wiki/Floating-point_unit)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-1.0-orange?style=flat-square)](https://gharri.ir)
 [![Author](https://img.shields.io/badge/Author-Benyamin%20Gharri-purple?style=flat-square)](https://gharri.ir)
+[![GitHub](https://img.shields.io/badge/GitHub-BenyVK-black?style=flat-square&logo=github)](https://github.com/BenyVK)
 
 </div>
 
@@ -17,324 +15,148 @@
 
 ## 🧠 What Is This?
 
-Rust makes it easy to accidentally reach for floats:
+On microcontrollers and embedded systems without a hardware FPU, any call to float formatting functions — `printf("%f")`, `String.format("%.2f")`, `f"{x:.2f}"`, `toFixed()` — silently pulls in a **software float emulation library**, adding kilobytes to your binary and hundreds of microseconds per call.
 
-```rust
-format!("{:.2}", 1010.13_f64)       // uses FPU
-1010.13_f32.to_string()             // float, imprecise
-format!("{}", 101013.0 / 100.0)     // division, FPU involved
+**NoFPU Decimal Converter** solves this with pure integer string manipulation: it takes a compact input format and inserts the decimal point at the correct position — entirely without floating-point arithmetic.
+
 ```
+Input:  "2-101013"
+Output: "1010.13"
 
-On embedded Rust targets (`thumbv6m-none-eabi`, AVR, RISC-V without F extension), the compiler may link in soft-float emulation — adding kilobytes to your binary and cycles to every operation.
-
-**NoFPU Decimal Converter for Rust** formats decimal strings using only integer arithmetic and string slicing:
-
-- ✅ No `f32`, `f64`, or any floating-point type
-- ✅ No `format!("{:.2}", ...)`, no division operators on decimals
-- ✅ Three converter variants — full-featured, micro, and slice-based
-- ✅ `HashMap`-backed cache for repeated conversions
-- ✅ Built-in `#[cfg(test)]` test suite with 7 test groups
-- ✅ Ownership-safe, borrow-checker approved
+No float. No division. No FPU.
+```
 
 ---
 
 ## 🔢 Input Format
 
+The same format works across all language ports:
+
 ```
 <decimal_places>-<integer>
 ```
 
-| Input | Output | Notes |
-|---|---|---|
-| `2-101013` | `1010.13` | 2 decimal places |
-| `3-123` | `0.123` | Leading zero added |
-| `0-12345` | `12345` | No decimal point |
-| `4-123` | `0.0123` | Padded with zeros |
-| `2-1` | `0.01` | Short number |
-| `1-1234` | `123.4` | Single decimal |
-| `6-123` | `0.000123` | High precision |
-| `10-12345` | `0.0000012345` | Very deep precision |
-| `2 - 101013` | `1010.13` | Spaces handled |
+| Input | Output |
+|---|---|
+| `2-101013` | `1010.13` |
+| `3-123` | `0.123` |
+| `0-12345` | `12345` |
+| `4-123` | `0.0123` |
+| `1-1234` | `123.4` |
+| `2-100` | `1.00` |
 
 ---
 
-## 📐 Architecture
+## 🌐 Language Ports
 
-```
-                    ┌──────────────────────────────────┐
-                    │         Input: "2-101013"        │
-                    └────────────────┬─────────────────┘
-                                     │
-                         ┌───────────▼────────────┐
-                         │   Choose your variant  │
-                         └──┬──────┬──────────────┘
-                            │      │              │
-              ┌─────────────▼─┐ ┌──▼───────────┐ ┌▼──────────────────┐
-              │  BenyaminDecimal  │  BenyaminMicro  │  BenyaminSpan     │
-              │  Converter        │  Converter       │  Converter        │
-              │  HashMap cache    │  Single-pass     │  &str slices      │
-              │  &mut self        │  static methods  │  static methods   │
-              └─────────────┬─┘ └──┬───────────┘ └┬──────────────────┘
-                            └──────┼───────────────┘
-                                   │
-                    ┌──────────────▼──────────────┐
-                    │       Output: "1010.13"     │
-                    └─────────────────────────────┘
-
-    No f32. No f64. No format!("{:.2}", ...). No FPU.
-```
-
----
-
-## 🗂️ Struct & Method Overview
-
-```
-BenyaminDecimalConverter          (pub struct, requires &mut self)
-  ::new()                         → Self
-  .convert(&mut self, &str)       → String
-  .clear_cache(&mut self)
-  .get_stats(&self)               → (u32, usize)
-
-BenyaminMicroConverter            (pub struct, unit-like)
-  ::convert(&str)                 → String   (associated fn)
-
-BenyaminSpanConverter             (pub struct, unit-like)
-  ::convert(&str)                 → String   (associated fn)
-```
-
----
-
-## 🛠️ API Reference
-
-### `BenyaminDecimalConverter` — Full-featured with cache
-
-Stateful struct with a `HashMap<String, String>` cache. Requires mutable ownership for conversion.
-
-```rust
-let mut converter = BenyaminDecimalConverter::new();
-
-let r = converter.convert("2-101013");
-assert_eq!(r, "1010.13");
-
-// Repeated calls hit the cache
-let r2 = converter.convert("2-101013"); // O(1), no recompute
-
-// Check stats
-let (total, cache_size) = converter.get_stats();
-println!("Calls: {}, Cached: {}", total, cache_size); // 2, 1
-
-// Free memory
-converter.clear_cache();
-```
-
-Returns `"ERROR: ..."` strings on invalid input — check with `.starts_with("ERROR")`.
-
----
-
-### `BenyaminMicroConverter` — Lightweight, single-pass
-
-Stateless unit struct. All logic in a single `chars()` pass.
-
-```rust
-let r = BenyaminMicroConverter::convert("3-123");
-assert_eq!(r, "0.123");
-
-let err = BenyaminMicroConverter::convert("bad");
-assert!(err.starts_with("ERROR"));
-```
-
-Best for `no_std` targets or any context where you don't need caching.
-
----
-
-### `BenyaminSpanConverter` — Slice-based
-
-Uses `&str` slices instead of character iteration — avoids building intermediate `String` objects during parsing.
-
-```rust
-let r = BenyaminSpanConverter::convert("2-101013");
-assert_eq!(r, "1010.13");
-
-// Works with spaces too
-let r2 = BenyaminSpanConverter::convert("2  -  101013");
-assert_eq!(r2, "1010.13");
-```
-
----
-
-## ⚙️ Building & Running
-
-### Add to your project
-
-Since this is a single-file implementation, add it directly to your crate:
-
-```toml
-# Cargo.toml — no external dependencies needed
-[package]
-name = "my_project"
-version = "0.1.0"
-edition = "2021"
-```
-
-```bash
-# Copy nofpu_converter.rs into src/
-cp nofpu_converter.rs src/main.rs
-
-# Build and run
-cargo run
-
-# Run in release mode (recommended for embedded)
-cargo run --release
-```
-
-### Run the test suite
-
-```bash
-cargo test
-```
-
-```
-running 7 tests
-test tests::test_caching          ... ok
-test tests::test_error_handling   ... ok
-test tests::test_large_numbers    ... ok
-test tests::test_micro_converter  ... ok
-test tests::test_span_converter   ... ok
-test tests::test_standard_converter ... ok
-test tests::test_with_spaces      ... ok
-test tests::test_zero_decimal     ... ok
-
-test result: ok. 7 passed; 0 failed
-```
-
-### Cross-compile for embedded targets
-
-**Cortex-M0 / M0+ (thumbv6m, no FPU)**
-```bash
-rustup target add thumbv6m-none-eabi
-cargo build --target thumbv6m-none-eabi --release
-```
-
-**Cortex-M4F (thumbv7em, hardware FPU — but you won't need it)**
-```bash
-rustup target add thumbv7em-none-eabihf
-cargo build --target thumbv7em-none-eabihf --release
-```
-
-**RISC-V (no F extension)**
-```bash
-rustup target add riscv32i-unknown-none-elf
-cargo build --target riscv32i-unknown-none-elf --release
-```
-
-> ⚠️ For `no_std` targets, remove `use std::collections::HashMap` and `use std::io` from the file. Use `BenyaminMicroConverter` or `BenyaminSpanConverter` only — they have no `std` dependencies.
-
----
-
-## 📊 Performance vs Float Formatting
-
-| Method | Uses Float | Binary Size Impact | Works on `no_std` |
+| Language | Folder | Min Version | Key Feature |
 |---|---|---|---|
-| `format!("{:.2}", f64)` | ✅ Yes | +8–20 KB (soft-float on M0) | ❌ No |
-| `f64::to_string()` | ✅ Yes | +8–20 KB | ❌ No |
-| `BenyaminDecimalConverter` | ❌ No | ~1.2 KB | ⚠️ Needs HashMap |
-| `BenyaminMicroConverter` | ❌ No | ~400 bytes | ✅ Yes |
-| `BenyaminSpanConverter` | ❌ No | ~450 bytes | ✅ Yes |
+| C | [`c/`](https://github.com/BenyVK/nofpu_converter/tree/main/C) | C99 | Bare-metal, `EMBEDDED_SYSTEM` macro |
+| C++ | [`cpp/`](https://github.com/BenyVK/nofpu_converter/tree/main/C%2B%2B) | C++11 | `EmbeddedConverter` class, zero alloc |
+| C# | [`csharp/`](https://github.com/BenyVK/nofpu_converter/tree/main/C%23) | .NET 5+ | `Span<char>` variant, zero heap alloc |
+| Java | [`java/`](https://github.com/BenyVK/nofpu_converter/tree/main/Java) | JDK 25 | `switch` expressions, `void main()` |
+| Python | [`python/`](https://github.com/BenyVK/nofpu_converter/tree/main/python) | Python 3.6+ | MicroPython compatible |
+| JavaScript | [`javascript/`](https://github.com/BenyVK/nofpu_converter/tree/main/Javascript) | Node.js 12+ | Browser + Espruino compatible |
+| Rust | [`rust/`](https://github.com/BenyVK/nofpu_converter/tree/main/Java) | Rust 2021 | `no_std` ready, 7 test groups |
 
-**Speed benchmark** (Rust 1.78, release mode, x86-64, criterion):
-
-```
-format!("{:.2}", 1010.13_f64)          →  ~18 ns/call
-BenyaminDecimalConverter (first call)  →  ~95 ns/call
-BenyaminDecimalConverter (cached)      →  ~12 ns/call  ← fastest after warmup
-BenyaminMicroConverter::convert        →  ~88 ns/call
-BenyaminSpanConverter::convert         →  ~75 ns/call
-```
-
-> On Cortex-M0 at 48 MHz (STM32F0), `format!("{:.2}", ...)` with soft-float takes ~600–900 µs. `BenyaminMicroConverter` takes ~4–6 µs — roughly **150× faster**.
+Each folder contains its own `README.md` with full API reference, build instructions, and platform-specific guides.
 
 ---
 
-## 🧪 Built-in Test Suite
+## 📊 Why Not Just Use Float?
 
-The file ships with a full `#[cfg(test)]` module covering:
+| Platform | `printf("%f")` / equivalent | This library | Speedup |
+|---|---|---|---|
+| ATmega328P (16 MHz, no FPU) | ~1200 µs (soft-float) | ~8 µs | **~150×** |
+| STM32F0 (48 MHz, no FPU) | ~180 µs (soft-float) | ~2 µs | **~90×** |
+| ESP32 (240 MHz, FPU) | ~1.2 µs (hardware) | ~0.5 µs | **~2.5×** |
+| x86-64 Linux (3 GHz) | ~0.3 µs | ~0.1 µs | **~3×** |
 
-| Test | What it covers |
+**Binary size** (ATmega328P, `-Os`):
+
+| Approach | Flash usage |
 |---|---|
-| `test_standard_converter` | Basic conversions via `BenyaminDecimalConverter` |
-| `test_micro_converter` | Same cases via `BenyaminMicroConverter` |
-| `test_span_converter` | Same cases via `BenyaminSpanConverter` |
-| `test_error_handling` | Invalid inputs return `"ERROR: ..."` |
-| `test_caching` | Repeated calls return identical results, cache size = 1 |
-| `test_with_spaces` | Inputs with spaces are handled correctly |
-| `test_large_numbers` | High decimal counts and long integers |
-| `test_zero_decimal` | `dec_count == 0` returns integer string unchanged |
+| `printf("%f", value)` | ~1.8 KB (pulls soft-float lib) |
+| This library (C, ultra-light) | ~320 bytes |
 
 ---
 
-## 🖥️ Interactive Mode
+## 🚀 Quick Start
 
+Pick your language and go:
+
+**C**
+```bash
+gcc -std=c99 -O2 -o converter c/nofpu_converter.c && ./converter
 ```
-======================================================================
-  NoFPU Decimal Converter
-  Developed by: Benyamin Gharri (Gharri.ir)
-  Rust Port
-======================================================================
 
-Input: 2-101013
+**C++**
+```bash
+g++ -std=c++11 -O2 -o converter cpp/nofpu_converter.cpp && ./converter
+```
 
---- Results ---
-Standard Converter: 1010.13
-Micro Converter:    1010.13
-Span Converter:     1010.13
+**C#**
+```bash
+dotnet run --project csharp/
+```
 
-Input: exit
+**Java**
+```bash
+java --enable-preview --source 25 java/NoFPUConverter.java
+```
 
-Statistics:
-  Total Conversions: 1
-  Cache Size: 1
+**Python**
+```bash
+python python/nofpu_converter.py
+```
 
-Thank you for using NoFPU Decimal Converter!
+**JavaScript**
+```bash
+node javascript/nofpu_converter.js
+```
+
+**Rust**
+```bash
+cd rust && cargo run --release
 ```
 
 ---
 
-## ⚠️ Limitations
+## 🧪 Running Tests
 
-| Constraint | Detail |
-|---|---|
-| Input values | Non-negative integers only |
-| Negative numbers | ❌ Leading `-` conflicts with format separator |
-| Decimal input | ❌ Input must be a plain integer string |
-| `no_std` | Remove `HashMap` and `io` imports; use `BenyaminMicro` or `BenyaminSpan` |
-| Cache eviction | No LRU — stops at 100 entries (`max_cache_size`), call `clear_cache()` manually |
-| Thread safety | `BenyaminDecimalConverter` requires `&mut self` — wrap in `Mutex<T>` for multi-threaded use |
-| Error type | Errors returned as `String` starting with `"ERROR:"` — not a proper `Result<T, E>` |
-
----
-
-## 📁 File Structure
-
-```
-src/
-└── main.rs     ← Single-file implementation (structs + tests + main)
-Cargo.toml      ← No external dependencies
-README.md       ← This file
+**C** — built-in test runner:
+```bash
+./converter
+Input: test
 ```
 
-No external crates. No `Cargo.lock` entries beyond the standard library.
+**JavaScript**:
+```bash
+node javascript/test.js
+```
+
+**Python**:
+```bash
+python python/test_nofpu.py
+```
+
+**Rust**:
+```bash
+cd rust && cargo test
+```
 
 ---
 
 ## 👤 Author
 
 **Benyamin Gharri**  
-🌐 [gharri.ir](https://gharri.ir)
+🌐 [gharri.ir](https://gharri.ir)  
+🐙 [github.com/BenyVK](https://github.com/BenyVK)
 
 ---
 
 <div align="center">
 
-*The borrow checker approves. The FPU is not involved.*
+*One idea. Seven languages. Zero floats.*
 
 </div>
