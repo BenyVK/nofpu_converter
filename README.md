@@ -57,7 +57,7 @@ The same format works across all language ports:
 | Java | [`java/`](https://github.com/BenyVK/nofpu_converter/tree/main/Java) | JDK 25 | `switch` expressions, `void main()` |
 | Python | [`python/`](https://github.com/BenyVK/nofpu_converter/tree/main/python) | Python 3.6+ | MicroPython compatible |
 | JavaScript | [`javascript/`](https://github.com/BenyVK/nofpu_converter/tree/main/Javascript) | Node.js 12+ | Browser + Espruino compatible |
-| Rust | [`rust/`](https://github.com/BenyVK/nofpu_converter/tree/main/Java) | Rust 2021 | `no_std` ready, 7 test groups |
+| Rust | [`rust/`](https://github.com/BenyVK/nofpu_converter/tree/main/Rust) | Rust 2021 | `no_std` ready, 7 test groups |
 
 Each folder contains its own `README.md` with full API reference, build instructions, and platform-specific guides.
 
