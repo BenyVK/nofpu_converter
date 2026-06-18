@@ -58,6 +58,7 @@ The same format works across all language ports:
 | Python | [`python/`](https://github.com/BenyVK/nofpu_converter/tree/main/python) | Python 3.6+ | MicroPython compatible |
 | JavaScript | [`javascript/`](https://github.com/BenyVK/nofpu_converter/tree/main/Javascript) | Node.js 12+ | Browser + Espruino compatible |
 | Rust | [`rust/`](https://github.com/BenyVK/nofpu_converter/tree/main/Rust) | Rust 2021 | `no_std` ready, 7 test groups |
+| GO | [`go/`](https://github.com/BenyVK/nofpu_converter/tree/main/Go) | GO 1.18 | `no_std` ready, 7 test groups |
 
 Each folder contains its own `README.md` with full API reference, build instructions, and platform-specific guides.
 
@@ -118,6 +119,11 @@ node javascript/nofpu_converter.js
 **Rust**
 ```bash
 cd rust && cargo run --release
+```
+
+**GO**
+```bash
+go build .\nofpu_converter.go
 ```
 
 ---
